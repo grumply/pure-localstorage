@@ -1,7 +1,8 @@
-{-# LANGUAGE CPP, OverloadedStrings, ViewPatterns #-}
+{-# LANGUAGE CPP, OverloadedStrings, ViewPatterns, ScopedTypeVariables #-}
 module Pure.Data.LocalStorage (get, put, delete, clear) where
 
 -- from base
+import Control.Exception (SomeException,catch)
 import Data.IORef
 import System.IO.Unsafe
 
@@ -18,8 +19,8 @@ import Pure.Data.Txt
 import qualified Data.HashMap.Strict as HashMap
 
 #ifdef __GHCJS__
-foreign import javascript unsafe
-  "try { window.localStorage.setItem($1, $2); $r = 1; } catch (e) { $r = 0; }"
+foreign import javascript safe
+  "window.localStorage.setItem($1, $2)"
   set_item_catch_js :: Txt -> Txt -> IO Int
 
 foreign import javascript unsafe
@@ -70,7 +71,7 @@ put :: ToJSON a => Txt -> a -> IO Bool
 put k v = do
 #ifdef __GHCJS__
   txt <- compress (toTxt (toJSON v))
-  res <- set_item_catch_js k txt
+  res <- catch (set_item_catch_js k txt >> return 1) (\(_ :: SomeException) -> return 0)
   return (res /= 0)
 #else
   modifyIORef localStorage (HashMap.insert k (toJSON v))
